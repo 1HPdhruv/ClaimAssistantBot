@@ -8,10 +8,11 @@ export function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value || value.trim() === "") {
     throw new Error(
-      `Missing environment variable ${name}. Add it to .env.local (and to Vercel project settings).`
+      `Missing environment variable ${name}. Add it to .env.local (and to Vercel project settings).`,
     );
   }
   return value.trim();
 }
 
-export const GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-3.8-flash";
+export const GEMINI_MODEL =
+  process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";

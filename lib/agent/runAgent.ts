@@ -3,7 +3,9 @@ import type { Content, Part } from "@google/genai";
 import { getGemini } from "../gemini";
 import { GEMINI_MODEL } from "../env";
 import type { ChatMessage } from "../schemas";
-import { tools } from "./tools";
+import { getTools } from "./tools";
+import type { Profile } from "../claimpilot/types";
+import type { AgentTool } from "./defineTool";
 import { toFunctionDeclarations } from "./defineTool";
 import { buildSystemPrompt } from "./systemPrompt";
 import type { AgentResult, AgentStep } from "./types";
@@ -18,8 +20,12 @@ const MAX_ROUNDS = 5;
  * 3. Send the results back to Gemini.
  * 4. Repeat until Gemini gives a final text answer (or MAX_ROUNDS is reached).
  */
-export async function runAgent(messages: ChatMessage[]): Promise<AgentResult> {
+export async function runAgent(
+  messages: ChatMessage[],
+  actor: Profile,
+): Promise<AgentResult> {
   const ai = getGemini();
+  const tools = getTools(actor);
   const steps: AgentStep[] = [];
   const functionDeclarations = toFunctionDeclarations(tools);
 
@@ -33,7 +39,7 @@ export async function runAgent(messages: ChatMessage[]): Promise<AgentResult> {
       model: GEMINI_MODEL,
       contents,
       config: {
-        systemInstruction: buildSystemPrompt(),
+        systemInstruction: buildSystemPrompt(actor),
         tools: [{ functionDeclarations }],
         temperature: 0.2,
       },
@@ -43,7 +49,10 @@ export async function runAgent(messages: ChatMessage[]): Promise<AgentResult> {
 
     // No tool requested: this is the final answer.
     if (calls.length === 0) {
-      return { reply: response.text?.trim() || "Sorry, I could not answer that.", steps };
+      return {
+        reply: response.text?.trim() || "Sorry, I could not answer that.",
+        steps,
+      };
     }
 
     // Keep Gemini's own turn (it carries the tool request) in the history.
@@ -52,7 +61,7 @@ export async function runAgent(messages: ChatMessage[]): Promise<AgentResult> {
 
     const responseParts: Part[] = [];
     for (const call of calls) {
-      const step = await runTool(call.name ?? "", call.args ?? {});
+      const step = await runTool(tools, call.name ?? "", call.args ?? {});
       steps.push(step);
       responseParts.push({
         functionResponse: {
@@ -66,30 +75,61 @@ export async function runAgent(messages: ChatMessage[]): Promise<AgentResult> {
   }
 
   return {
-    reply: "I needed too many steps for this request. Please try a simpler or more specific question.",
+    reply:
+      "I needed too many steps for this request. Please try a simpler or more specific question.",
     steps,
   };
 }
 
-async function runTool(name: string, rawArgs: unknown): Promise<AgentStep> {
+async function runTool(
+  tools: AgentTool[],
+  name: string,
+  rawArgs: unknown,
+): Promise<AgentStep> {
   const tool = tools.find((t) => t.name === name);
   if (!tool) {
-    return { tool: name, args: rawArgs, ok: false, writes: false, error: `Unknown tool: ${name}` };
+    return {
+      tool: name,
+      args: rawArgs,
+      ok: false,
+      writes: false,
+      error: `Unknown tool: ${name}`,
+    };
   }
 
   // Never trust the model's arguments: check them with Zod first.
   const parsed = tool.schema.safeParse(rawArgs);
   if (!parsed.success) {
-    const message = parsed.error.issues.map((i) => `${i.path.join(".") || "args"}: ${i.message}`).join("; ");
-    return { tool: name, args: rawArgs, ok: false, writes: tool.writes, error: `Invalid arguments: ${message}` };
+    const message = parsed.error.issues
+      .map((i) => `${i.path.join(".") || "args"}: ${i.message}`)
+      .join("; ");
+    return {
+      tool: name,
+      args: rawArgs,
+      ok: false,
+      writes: tool.writes,
+      error: `Invalid arguments: ${message}`,
+    };
   }
 
   try {
     const result = await tool.run(parsed.data);
-    return { tool: name, args: parsed.data, ok: true, writes: tool.writes, result };
+    return {
+      tool: name,
+      args: parsed.data,
+      ok: true,
+      writes: tool.writes,
+      result,
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Tool failed";
     console.error(`[tool ${name}]`, message); // shows tool errors in the terminal
-    return { tool: name, args: parsed.data, ok: false, writes: tool.writes, error: message };
+    return {
+      tool: name,
+      args: parsed.data,
+      ok: false,
+      writes: tool.writes,
+      error: message,
+    };
   }
 }

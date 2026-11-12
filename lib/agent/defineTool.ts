@@ -28,7 +28,7 @@ export function defineTool<S extends z.ZodObject>(tool: {
     description: tool.description,
     schema: tool.schema,
     writes: tool.writes ?? false,
-    run: (args) => tool.run(args as z.infer<S>),
+    run: (args) => tool.run(tool.schema.parse(args)),
   };
 }
 
@@ -52,7 +52,10 @@ function clean(node: unknown): unknown {
     if (!ALLOWED_KEYS.has(key)) continue;
     if (key === "properties" && value && typeof value === "object") {
       out.properties = Object.fromEntries(
-        Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, clean(v)])
+        Object.entries(value as Record<string, unknown>).map(([k, v]) => [
+          k,
+          clean(v),
+        ]),
       );
     } else if (key === "format" && value !== "date-time" && value !== "enum") {
       continue;
@@ -64,7 +67,9 @@ function clean(node: unknown): unknown {
 }
 
 /** Turns our tools into the function declarations Gemini expects. */
-export function toFunctionDeclarations(tools: AgentTool[]): FunctionDeclaration[] {
+export function toFunctionDeclarations(
+  tools: AgentTool[],
+): FunctionDeclaration[] {
   return tools.map((tool) => ({
     name: tool.name,
     description: tool.description,

@@ -18,3 +18,18 @@ next-env.d.ts
 # misc
 .DS_Store
 npm-debug.log*
+
+# ClaimPilot local demo state and private uploaded receipts
+.claimpilot/
+*.tsbuildinfo
+supabase/.temp/
+
+# All environment variants except the public template
+.env.*
+!.env.example
+
+# Generated verification output and temporary files
+artifacts/
+*.log
+*.tmp
+*.temp

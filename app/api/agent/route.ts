@@ -1,32 +1,25 @@
 import { NextResponse } from "next/server";
 import { agentRequestSchema } from "@/lib/schemas";
 import { runAgent } from "@/lib/agent/runAgent";
-
+import { getActor, sameOrigin } from "@/lib/claimpilot/session";
+import { apiError } from "@/lib/claimpilot/http";
 export const runtime = "nodejs";
 export const maxDuration = 60;
-
-/** POST /api/agent  body: { messages: [{ role: "user" | "model", text: string }] } */
-export async function POST(request: Request) {
-  const body = await request.json().catch(() => null);
-  const parsed = agentRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid request", details: parsed.error.issues }, { status: 400 });
-  }
-
+export async function POST(req: Request) {
   try {
-    const result = await runAgent(parsed.data.messages);
-    return NextResponse.json(result);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Agent failed";
-    console.error("[agent]", message);
-    const quota = /429|quota|RESOURCE_EXHAUSTED/i.test(message);
-    return NextResponse.json(
-      {
-        error: quota
-          ? "Gemini quota reached. Wait a minute and try again."
-          : message,
-      },
-      { status: quota ? 429 : 500 }
-    );
+    sameOrigin(req);
+    const actor = await getActor();
+    const d = agentRequestSchema.parse(await req.json());
+    if (!process.env.GEMINI_API_KEY)
+      return NextResponse.json(
+        {
+          error:
+            "Gemini is not configured. The expense, investigation and approval workspaces remain available.",
+        },
+        { status: 503 },
+      );
+    return NextResponse.json(await runAgent(d.messages, actor));
+  } catch (e) {
+    return apiError(e);
   }
 }

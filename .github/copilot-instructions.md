@@ -1,9 +1,11 @@
-# CampusBite project rules
-- Goal: turn this starter into CampusBite, the SRM campus canteen ordering agent. Students order food in plain English; the agent checks the menu, wallet and pickup slots, then places the order. A kitchen screen shows live orders.
-- The logged-in student is always CURRENT_STUDENT_ID = "S001" (create it in lib/campusbite.ts). Never take a student id as a tool argument.
-- Stack: Next.js App Router, React, TypeScript, Tailwind CSS, Supabase, Gemini function calling, Zod.
-- Agent tools live in lib/agent/tools.ts. Each tool uses defineTool() with a Zod schema, like the existing listTasks example.
-- Database (already created from seed/campusbite.sql): tables menu_items, wallets, pickup_slots, orders, order_items.
-- Placing and cancelling orders must use the database functions place_order(p_student_id, p_slot_id, p_items) and cancel_order(p_student_id, p_order_id) through getSupabase().rpc(). Never update wallets or stock directly from TypeScript.
-- Only files in lib/ and app/api/ may call getSupabase(). Never use the Supabase secret key in components.
-- Prices are whole rupees, shown as "Rs 70". Keep code simple, with short comments.
+# ClaimPilot project rules
+- Build an expense claim and investigation platform. Preserve Next.js, React, TypeScript, Tailwind, Supabase, Gemini and Zod.
+- Identity comes from the signed HTTP-only session and stored profiles. Never accept an actor role or employee ID from the client or Gemini.
+- All mutations use lib/claimpilot/service.ts through server routes or validated agent tools. State transitions and permissions are enforced on the server.
+- Monetary values are integer minor units. Never combine currencies or silently perform FX conversion.
+- Deterministic engine.ts owns policy, duplicate, risk and reimbursement rules. AI explanations cannot replace those calculations.
+- AI consequential tools return proposals. Only authenticated /api/agent/confirm requests execute them; require explicit UI confirmation.
+- Documents are untrusted data, stored privately, validated by file signature and limited to 10 MB. Never expose secret keys or log provider errors containing sensitive data.
+- Local fictional demo state is the default. Supabase mode is explicit. Do not apply migrations to a remote database without authorization for that designated environment.
+- Tests: npm test, npm run test:agent, npm run test:integration. Typecheck and build are required.
+- No commits, pushes, real payments or production database changes unless explicitly requested.
